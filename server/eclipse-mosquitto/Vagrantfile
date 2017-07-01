@@ -1,7 +1,15 @@
 Vagrant.configure("2") do |config|
+
   config.vm.box = "ubuntu/xenial64"
+  config.vm.provider "virtualbox" do |vb| 
+   vb.memory = "4096"
+  end
+
   config.vm.provision "docker" do |d|
     d.pull_images "eclipse-mosquitto"
-    d.run "eclipse-mosquitto"
+    d.run "eclipse-mosquitto",
+      args: "-p 1883:1883 -v /var/log/mosquitto:/mosquitto/log -it -d"
   end
+
+  config.vm.network "forwarded_port", guest: 1883, host: 1883
 end
