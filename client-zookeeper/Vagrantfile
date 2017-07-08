@@ -1,0 +1,15 @@
+Vagrant.configure("2") do |config|
+
+  config.vm.box = "ubuntu/xenial64"
+  config.vm.provider "virtualbox" do |vb| 
+   vb.memory = "4096"
+  end
+
+  config.vm.provision "docker" do |d|
+    d.pull_images "zookeeper"
+    d.run "zookeeper",
+      args: "-p 2181:2181 --restart always -it -d"
+  end
+
+  config.vm.network "forwarded_port", guest: 2181, host: 2181
+end
