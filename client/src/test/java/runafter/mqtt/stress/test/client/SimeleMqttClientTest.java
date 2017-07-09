@@ -50,7 +50,7 @@ public class SimeleMqttClientTest {
         int threadPoolCount = 16;
         MQTT.setBlockingThreadPool(fixedThreadPoolOf(threadPoolCount));
         sleep(30000L);
-        Collection<MQTTConnection> connections = connect(50000);
+        Collection<MQTTConnection> connections = connect(500);
         awaitConnectedAll(connections);
         assertConnected(connections);
         sleep(100000L);
