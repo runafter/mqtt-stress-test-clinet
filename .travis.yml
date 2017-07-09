@@ -1,0 +1,25 @@
+sudo: required
+
+language: java
+jdk:
+  - oraclejdk8
+  
+services:
+  - docker
+
+before_install:
+- docker pull eclipse-mosquitto
+- docker run -p 1883:1883 -d eclipse-mosquitto
+- docker pull quay.io/coreos/etcd
+- docker run -p 2379:2379 -p 2380:2380 -d /usr/local/bin/etcd quay.io/coreos/etcd --name node --initial-advertise-peer-urls http://0.0.0.0:2380 --listen-peer-urls http://0.0.0.0:2380 --advertise-client-urls http://0.0.0.0:2379 --listen-client-urls http://0.0.0.0:2379  --initial-cluster node=http://0.0.0.0:2380
+
+before_cache:
+  - rm -f  $HOME/.gradle/caches/modules-2/modules-2.lock
+  - rm -fr $HOME/.gradle/caches/*/plugin-resolution/
+cache:
+  directories:
+    - $HOME/.gradle/caches/
+    - $HOME/.gradle/wrapper/
+
+script:
+  - cd client; ./gradlew clean build --info
