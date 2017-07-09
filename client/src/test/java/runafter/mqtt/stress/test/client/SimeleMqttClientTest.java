@@ -1,6 +1,7 @@
 package runafter.mqtt.stress.test.client;
 
 import org.fusesource.mqtt.client.*;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -27,10 +28,19 @@ public class SimeleMqttClientTest {
     private static final long TIMEOUT = 10000L;
     private static final String CLIENT_ID = "CLIENT";
     private static final Topic[] TOPICS = new Topic[] {new Topic("public", QoS.EXACTLY_ONCE)};
+    private Collection<MQTTConnection> connections;
+    private FutureConnection connection;
 
     @Before
     public void setUp() throws URISyntaxException {
+        connection = null;
+        connections = null;
+    }
 
+    @After
+    public void tearDown() throws Exception {
+        disconnectAll(connections);
+        disconnect(connection);
     }
 
     @Test
@@ -39,22 +49,19 @@ public class SimeleMqttClientTest {
         mqtt.setClientId(CLIENT_ID);
         mqtt.setHost("tcp://localhost:1883");
         mqtt.setKeepAlive((short) 60);
-        FutureConnection connection = mqtt.futureConnection();
+        connection = mqtt.futureConnection();
         Future<Void> future = connection.connect();
         await(future);
         assertThat(connection.isConnected(), is(true));
-        connection.disconnect().await();
     }
     @Test
     public void shouldConnectToServerUsingFutureConnectionMassiveClients() throws Exception {
         int threadPoolCount = 16;
         MQTT.setBlockingThreadPool(fixedThreadPoolOf(threadPoolCount));
         sleep(30000L);
-        Collection<MQTTConnection> connections = connect(500);
+        connections = connect(50);
         awaitConnectedAll(connections);
         assertConnected(connections);
-        sleep(100000L);
-        disconnectAll(connections);
     }
 
     private void sleep(long time) throws InterruptedException {
@@ -79,8 +86,15 @@ public class SimeleMqttClientTest {
     }
 
     private void disconnectAll(Collection<MQTTConnection> connections) throws Exception {
+        if (connections == null)
+            return;
         for (MQTTConnection connection : connections)
             connection.connection.disconnect().await();
+    }
+    private void disconnect(FutureConnection connection) throws Exception {
+        if (connection == null)
+            return;
+        connection.disconnect().await();
     }
 
     private void assertConnected(Collection<MQTTConnection> connections) {
