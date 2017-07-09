@@ -1,6 +1,8 @@
 package runafter.mqtt.stress.test.client;
 
 import org.fusesource.mqtt.client.*;
+import org.fusesource.mqtt.client.Future;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -10,10 +12,7 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.hamcrest.CoreMatchers.is;
@@ -22,15 +21,24 @@ import static org.junit.Assert.assertThat;
 /**
  * Created by runaf on 2017-07-01.
  */
-public class SimeleMqttClientTest {
-    private static final Logger LOGGER = LoggerFactory.getLogger(SimeleMqttClientTest.class);
+public class SimpleMqttClientTest {
+    private static final Logger LOGGER = LoggerFactory.getLogger(SimpleMqttClientTest.class);
     private static final long TIMEOUT = 10000L;
     private static final String CLIENT_ID = "CLIENT";
     private static final Topic[] TOPICS = new Topic[] {new Topic("public", QoS.EXACTLY_ONCE)};
+    private Collection<MQTTConnection> connections;
+    private FutureConnection connection;
 
     @Before
     public void setUp() throws URISyntaxException {
+        connection = null;
+        connections = null;
+    }
 
+    @After
+    public void tearDown() throws Exception {
+        disconnectAll(connections);
+        disconnect(connection);
     }
 
     @Test
@@ -39,22 +47,19 @@ public class SimeleMqttClientTest {
         mqtt.setClientId(CLIENT_ID);
         mqtt.setHost("tcp://localhost:1883");
         mqtt.setKeepAlive((short) 60);
-        FutureConnection connection = mqtt.futureConnection();
+        connection = mqtt.futureConnection();
         Future<Void> future = connection.connect();
-        await(future);
+        awaitUntilConnected(connection, future, TIMEOUT);
         assertThat(connection.isConnected(), is(true));
-        connection.disconnect().await();
     }
     @Test
     public void shouldConnectToServerUsingFutureConnectionMassiveClients() throws Exception {
         int threadPoolCount = 16;
         MQTT.setBlockingThreadPool(fixedThreadPoolOf(threadPoolCount));
         sleep(30000L);
-        Collection<MQTTConnection> connections = connect(50000);
+        connections = connect(50);
         awaitConnectedAll(connections);
         assertConnected(connections);
-        sleep(100000L);
-        disconnectAll(connections);
     }
 
     private void sleep(long time) throws InterruptedException {
@@ -79,8 +84,15 @@ public class SimeleMqttClientTest {
     }
 
     private void disconnectAll(Collection<MQTTConnection> connections) throws Exception {
+        if (connections == null)
+            return;
         for (MQTTConnection connection : connections)
             connection.connection.disconnect().await();
+    }
+    private void disconnect(FutureConnection connection) throws Exception {
+        if (connection == null)
+            return;
+        connection.disconnect().await();
     }
 
     private void assertConnected(Collection<MQTTConnection> connections) {
@@ -90,8 +102,19 @@ public class SimeleMqttClientTest {
 
     private void awaitConnectedAll(Collection<MQTTConnection> connections) throws Exception {
         long timeout = TIMEOUT * connections.size();
-         for (MQTTConnection connection : connections)
-             await(connection.future, timeout);
+         for (MQTTConnection connection : connections) {
+             awaitUntilConnected(connection.connection, connection.future, timeout);
+         }
+    }
+
+    private void awaitUntilConnected(FutureConnection connection, Future<Void> future, long timeout) throws Exception {
+        final int retryLimit = 3;
+        int retry = 0;
+        while (!connection.isConnected() && retry++ < retryLimit) {
+            await(future, timeout);
+            if (!connection.isConnected())
+                sleep(100L);
+        }
     }
 
     private Collection<MQTTConnection> connect(int count) throws URISyntaxException {
