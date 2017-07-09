@@ -8,10 +8,10 @@ vagrant box add ubuntu/xenial64
 vagrant up
 ```
 
-# ZooKeeper for clients
+# ETCD for clients
 
 ```
-cd client-zookeeper
+cd client-etcd
 vagrant box add ubuntu/xenial64
 vagrant up
 ```
