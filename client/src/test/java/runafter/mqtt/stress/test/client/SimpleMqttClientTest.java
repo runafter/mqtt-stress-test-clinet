@@ -23,8 +23,8 @@ import static org.junit.Assert.assertThat;
 /**
  * Created by runaf on 2017-07-01.
  */
-public class SimeleMqttClientTest {
-    private static final Logger LOGGER = LoggerFactory.getLogger(SimeleMqttClientTest.class);
+public class SimpleMqttClientTest {
+    private static final Logger LOGGER = LoggerFactory.getLogger(SimpleMqttClientTest.class);
     private static final long TIMEOUT = 10000L;
     private static final String CLIENT_ID = "CLIENT";
     private static final Topic[] TOPICS = new Topic[] {new Topic("public", QoS.EXACTLY_ONCE)};
