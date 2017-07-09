@@ -22,5 +22,7 @@ cache:
     - $HOME/.gradle/caches/
     - $HOME/.gradle/wrapper/
 
+before_script:
+  - chmod +x client/gradlew
 script:
-  - sh -c "cd client; ./gradlew clean build --info"
+  - cd client; ./gradlew clean build --info
