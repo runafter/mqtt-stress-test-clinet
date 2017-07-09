@@ -103,9 +103,17 @@ public class SimpleMqttClientTest {
     }
 
     private void awaitConnectedAll(Collection<MQTTConnection> connections) throws Exception {
+        final int retryLimit = 3;
         long timeout = TIMEOUT * connections.size();
-         for (MQTTConnection connection : connections)
-             await(connection.future, timeout);
+         for (MQTTConnection connection : connections) {
+             int retry = 0;
+             FutureConnection mqttConnection = connection.connection;
+             while (!mqttConnection.isConnected() && retry++ < retryLimit) {
+                 await(connection.future, timeout);
+                 if (!mqttConnection.isConnected())
+                     sleep(100L);
+             }
+         }
     }
 
     private Collection<MQTTConnection> connect(int count) throws URISyntaxException {
