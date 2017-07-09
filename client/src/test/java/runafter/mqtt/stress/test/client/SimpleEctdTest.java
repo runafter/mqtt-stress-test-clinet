@@ -1,9 +1,7 @@
 package runafter.mqtt.stress.test.client;
 
 import mousio.etcd4j.EtcdClient;
-import mousio.etcd4j.responses.EtcdAuthenticationException;
-import mousio.etcd4j.responses.EtcdException;
-import mousio.etcd4j.responses.EtcdVersionResponse;
+import mousio.etcd4j.responses.*;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -25,9 +23,13 @@ import static org.junit.Assert.assertThat;
  */
 public class SimpleEctdTest {
     private static final Logger LOGGER = LoggerFactory.getLogger(SimpleEctdTest.class);
-    private static final String KEY = "key1";
+    private static final String KEY = "/key1";
     private static final String VALUE = "value1";
     private static final long TIMEOUT = 3000L;
+    private static final String DIR = "/dir1";
+    private static final String KEY1_WITH_DIR = DIR + "/key1";
+    private static final String KEY2_WITH_DIR = DIR + "/key2";
+    private static final String KEY3_WITH_DIR = DIR + "/key3";
     private EtcdClient ec;
 
     @Before
@@ -35,16 +37,37 @@ public class SimpleEctdTest {
         ec = new EtcdClient(URI.create("http://127.0.0.1:2379"));
     }
     @After
-    public void tearDown() throws EtcdAuthenticationException, TimeoutException, EtcdException {
+    public void tearDown() throws Exception {
         try {
             if (ec != null) {
-                ec.delete(KEY).send().get();
+                clearKey(KEY);
+                clearDirKey(DIR);
                 ec.close();
             }
         } catch (IOException e) {
             LOGGER.error("ec.close", e);
         }
     }
+
+    private void clearKey(String key) throws Exception {
+        try {
+            ec.delete(key).send().get();
+        } catch (EtcdException  e) {
+            if (!e.isErrorCode(EtcdErrorCode.KeyNotFound))
+                throw e;
+        }
+    }
+
+    private void clearDirKey(String dir) throws Exception {
+        try {
+        if (ec.getDir(dir).send().get().node != null)
+            ec.deleteDir(dir).recursive().send().get();
+        } catch (EtcdException  e) {
+            if (!e.isErrorCode(EtcdErrorCode.KeyNotFound))
+                throw e;
+        }
+    }
+
     @Test
     public void shouldConnect() throws IOException {
         EtcdVersionResponse version = ec.version();
@@ -83,6 +106,32 @@ public class SimpleEctdTest {
         ec.put(KEY, VALUE).send().get();
         await(latch);
         assertThat(latch.getCount(), is(0L));
+    }
+
+    @Test
+    public void shouldPutDir() throws Exception {
+        ec.put(KEY1_WITH_DIR, VALUE).send().get();
+        ec.put(KEY2_WITH_DIR, VALUE).send().get();
+        ec.put(KEY3_WITH_DIR, VALUE).send().get();
+        EtcdKeysResponse response = ec.getDir(DIR).dir().send().get();
+        assertThat(response, notNullValue());
+        assertThat(response.node.nodes.size(), is(3));
+    }
+
+    @Test
+    public void shouldWatchDir() throws Exception {
+        CountDownLatch latch = new CountDownLatch(3);
+        ec.getDir(DIR).waitForChange().send().addListener(response -> {
+            latch.countDown();
+        });
+        await(latch);
+        assertThat(latch.getCount(), is(3L));
+
+        ec.put(KEY1_WITH_DIR, VALUE).send().get();
+        ec.put(KEY2_WITH_DIR, VALUE).send().get();
+        ec.put(KEY3_WITH_DIR, VALUE).send().get();
+
+        assertThat(latch.getCount(), is(3L));
     }
 
     private void await(CountDownLatch latch) throws InterruptedException {
